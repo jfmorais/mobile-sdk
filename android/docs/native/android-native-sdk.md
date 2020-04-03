@@ -1,18 +1,16 @@
 # Guia de Integração com a Mobile Insights Plataform 
 
-O Objetivo desse manual descrever o processo de integração da MIP-SDK em qualquer aplicativo, a SDK tem como objetivo coletar informação para ajudar a combater a expansão do COVID-19.
+Esse manual descreve o processo de integração da MIP-SDK (Mobile Insights Platform) em aplicativos Android. Essa biblioteca permite a coleta de informações anonimizadas de um dispositivo, de forma a fornecer insumos  para o combate a expansão do COVID-19.
 
-Esse manual utiliza ambiente de referência a IDE **Android Studio 3.6** em execução no sistema operacional **macOS Mojave**. 
+Nesse exemplo, utilizaremos o **Android Studio 3.6** em execução no sistema operacional **macOS Mojave**.
 
 ## Requisitos Técnicos
 
-A MIP-SDK suporta a API level minimo 16 (Jelly Bean), lançada no fim de 2012. Qualquer versão de SDK Android igual ou superior ao 16 pode ser utilizado.
-
-Basta que no `build.gradle` do aplicativo desejado, o parâmetro **minSdkVersion** esteja configurado como `minSdkVersion 16`.
+A MIP-SDK requer a API Android igual ou superior a 16 (`minSdkVersion 16`).
 
 # Passos para Integração
 
-A MIP-SDK vai realizar a coleta da localização do telefone , encriptar e  anonimizar e enviar essas informações. Todos os itens detalhados abaixo são necessários para integrar a biblioteca corretamente.
+A MIP-SDK é responsável por coletar, anonimizar, encriptar e enviar os dados do dispositivo. Os itens a seguir são necessários para a correta integração da biblioteca.
 
 ## 1. Importação da biblioteca
 
@@ -42,11 +40,9 @@ Com o arquivo `build.gradle` aberto, incluir a dependência do SDK no atributo `
 
 ![New Module](./09.png)
 
-## 2. Configuração do metadado COVID da MIP SDK
+## 2. Metadados da MIP-SDK
 
-Esse dado é importante pois através dele que a MIP-SDK vai redirecionar  os dados  coletados para  o combate a expansão do COVID-19.
-
-Para configurar esse parâmetro, adicione a linha abaixo dentro da tag `<application>` do arquivo `AndroidManiferst.xml` do aplicativo no qual a SDK vai ser integrada.
+Para configurar o metadado, adicione a tag `meta-data` abaixo dentro da tag `<application>` do arquivo `AndroidManiferst.xml`.
 
 * `<meta-data android:name="br.com.experian.mip.PARTNER_CODE" android:value="COVID"/>`
 
@@ -54,11 +50,9 @@ Para configurar esse parâmetro, adicione a linha abaixo dentro da tag `<applica
 
 A Lei Geral de Proteção de Dados Pessoais (LGPD ou LGPDP), Lei nº 13.709/2018, é a legislação brasileira que regula as atividades de tratamento de dados pessoais e que também altera os artigos 7º e 16 do Marco Civil da Internet.
 
-Para que a coleta de dados seja efetuada, o SDK MIP-SDK deve ser notificado que a localização  coletada  sera utilizada para combater a expansão do COVID-19, essa informação deve  ser apresentada nos **Termos e Condições** do aplicativo no qual a SDK foi integrada e que foi aceita pelo usuário. 
+Para garantir o cumprimento da referida lei, o MIP-SDK deve ser notificado do aceite do usuário nos termos de que seus dados serão utilizados para essa finalidade específica. Para isso, utilize o método listado abaixo, disponível na classe  `br.com.experian.android.mobile.sdk.library.core.ExpMobileInsightsPlatform`:
 
-Para isso, utilize um ou mais métodos da classe `br.com.experian.android.mobile.sdk.library.core.ExpMobileInsightsPlatform`, listados abaixo:
-
-* `userAcceptedDataForGoodAgreement()` - sinaliza que os dado sera utilizado para combater o COVID-19.
+* `userAcceptedDataForGoodAgreement()`
 
 ## 4. Versão do documento Termos e Condições
 
@@ -72,13 +66,69 @@ Caso utilize a ferramenta ProGuard, é necessário adicionar a linha abaixo no a
 -keep class br.com.experian.android.mobile.sdk.library.core.** { *; }
 ```
 
-## 6. Efetuar o agendamento da coleta continua da localização
+## 6. Requisitar a localização
 
-Para que o combate ocorra com efetividade é necessário agendar coleta continua da localização do usuário. É importante salientar que esse processo foi feito sem causar impacto na rede de dados e no consumo da bateria do celular do usuário.
+Para que a MIP SDK colete a localização o aplicativo deve ter acesso a mesma, para requisitar acesso a localização basta incluir as linhas abaixo no aplicativo:
 
-Para agendar a execução da coleta de dados, é necessário chamar o método `scheduleContinuousCollection()` da classe `br.com.experian.android.mobile.sdk.library.core.ExpMobileInsightsPlatform` na atividade inicial da aplicação.
+Arquivo `AndroidManifest.xml`
 
-## 7. Extração Única da localização
+```xml
+<manifest ... >
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+</manifest>
+```
+
+```java
+boolean permissionAccessCoarseLocationApproved =
+    ActivityCompat.checkSelfPermission(this, permission.ACCESS_COARSE_LOCATION)
+        == PackageManager.PERMISSION_GRANTED;
+
+if (permissionAccessCoarseLocationApproved) {
+   boolean backgroundLocationPermissionApproved =
+           ActivityCompat.checkSelfPermission(this,
+               permission.ACCESS_BACKGROUND_LOCATION)
+               == PackageManager.PERMISSION_GRANTED;
+
+   if (backgroundLocationPermissionApproved) {
+       // App can access location both in the foreground and in the background.
+       // Start your service that doesn't have a foreground service type
+       // defined.
+   } else {
+       // App can only access location in the foreground. Display a dialog
+       // warning the user that your app must have all-the-time access to
+       // location in order to function properly. Then, request background
+       // location.
+       ActivityCompat.requestPermissions(this, new String[] {
+           Manifest.permission.ACCESS_BACKGROUND_LOCATION},
+           your-permission-request-code);
+   }
+} else {
+   // App doesn't have access to the device's location at all. Make full request
+   // for permission.
+   ActivityCompat.requestPermissions(this, new String[] {
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+        Manifest.permission.ACCESS_BACKGROUND_LOCATION
+        },
+        your-permission-request-code);
+}
+```
+
+## 7. Coleta de Dados
+
+Para sermos capazes de fornecer informações mais úteis, é necessário habilitar dois tipos de coleta: a) em segundo plano (background) e b) instantânea.
+
+A coleta em segundo plano ocorre de maneira transparente para o usuário e utiliza pouquíssimos recursos de dados e bateria do dispositivo. Para agendar a sua execução recorrente, utilize o método `scheduleContinuousCollection()` da classe `br.com.experian.android.mobile.sdk.library.core.ExpMobileInsightsPlatform` na atividade inicial da aplicação.
+
+A coleta instantânea deve ser executada quando a aplicação está em execução pelo usuário. Solicitamos que essa coleta seja feita, se possível, uma vez ao dia.
+
+
+## 8. Efetuar o agendamento da coleta continua da localização
+
+Para sermos capazes de fornecer informações mais úteis, é necessário habilitar dois tipos de coleta: a) em segundo plano (background) e b) instantânea.
+
+A coleta em segundo plano ocorre de maneira transparente para o usuário e utiliza pouquíssimos recursos de dados e bateria do dispositivo. Para agendar a sua execução recorrente, utilize o método `scheduleContinuousCollection()` da classe `br.com.experian.android.mobile.sdk.library.core.ExpMobileInsightsPlatform` na atividade inicial da aplicação.
+
+## 9. Extração Única da localização
 
 O MIP-SDK tem como característica principal o respeito ao aplicativo dos seus parceiros. Por esse motivo, o processamento e envio dos dados costuma ocorrer em situações ótimas para o aparelho (carregando e conectado em rede Wi-Fi), o que pode ocasionar algum tempo adicional no envio dos dados. Para garantir pelo menos a primeira extração completa dos dados, é recomendável efetuar uma chamada do método `runOneShotCollection()`.
 
@@ -103,18 +153,19 @@ public class MainActivity extends AppCompatActivity {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
 
-    //definicao do client code COVID
-    mip.clientCode("COVID");
-
-    //Aceite do termos e condicoes para ajudar no combate ao COVID
+    //Usuario aceitou os Termos e Condicoes
+    //de compartilhamento anonimo dos dados
     mip.userAcceptedDataForGoodAgreement();
     mip.privacyPolicy("1.0");
 
-    //agenda-se a coleta continua (em intervalos regulares) da localizacao para combater o  COVID
+    //agendamento coleta continua
     mip.scheduleContinuousCollection();
-    
-    //faz uma coleta unica no instante da execucao da do  app.
-    runOneShotCollection();
+
+    //se primeira execucao do dia
+    if (firstExecutionOfDay()) {
+      //execucao coleta instantanea
+      runOneShotCollection();
+    }
   }
 
   public void runOneShotCollection() {

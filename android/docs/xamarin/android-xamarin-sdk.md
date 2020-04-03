@@ -67,6 +67,52 @@ Dentro do arquivo `AssemblyInfo.cs` insira a linha abaixo com o seu código de p
 ```c#
 [assembly: MetaDada("br.com.experia.mip.PARTNER_CODE", Value = "COVID")]
 ```
+## Requisitar a localização
+
+Para que a MIP SDK colete a localização o aplicativo deve ter acesso a mesma, para requisitar acesso a localização basta incluir as linhas abaixo no aplicativo:
+
+Arquivo `AndroidManifest.xml`
+
+```xml
+<manifest ... >
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+</manifest>
+```
+
+```java
+boolean permissionAccessCoarseLocationApproved =
+    ActivityCompat.checkSelfPermission(this, permission.ACCESS_COARSE_LOCATION)
+        == PackageManager.PERMISSION_GRANTED;
+
+if (permissionAccessCoarseLocationApproved) {
+   boolean backgroundLocationPermissionApproved =
+           ActivityCompat.checkSelfPermission(this,
+               permission.ACCESS_BACKGROUND_LOCATION)
+               == PackageManager.PERMISSION_GRANTED;
+
+   if (backgroundLocationPermissionApproved) {
+       // App can access location both in the foreground and in the background.
+       // Start your service that doesn't have a foreground service type
+       // defined.
+   } else {
+       // App can only access location in the foreground. Display a dialog
+       // warning the user that your app must have all-the-time access to
+       // location in order to function properly. Then, request background
+       // location.
+       ActivityCompat.requestPermissions(this, new String[] {
+           Manifest.permission.ACCESS_BACKGROUND_LOCATION},
+           your-permission-request-code);
+   }
+} else {
+   // App doesn't have access to the device's location at all. Make full request
+   // for permission.
+   ActivityCompat.requestPermissions(this, new String[] {
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+        Manifest.permission.ACCESS_BACKGROUND_LOCATION
+        },
+        your-permission-request-code);
+}
+```
 
 ### Resumo
 
